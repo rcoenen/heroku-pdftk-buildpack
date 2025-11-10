@@ -18,7 +18,26 @@ This buildpack requires the **Heroku APT buildpack** to install system packages.
 
 ## How to Use
 
-### 1. Add Buildpacks to Your App
+### 1. Create Aptfile in Your Application Root
+
+**IMPORTANT**: You must create an `Aptfile` in your Laravel/PHP application root (not in the buildpack repo). This tells the apt buildpack which packages to install.
+
+Create a file named `Aptfile` in your application root with these contents:
+
+```
+pdftk-java
+libbcprov-java
+libcommons-lang3-java
+```
+
+Commit this file to your repository:
+
+```bash
+git add Aptfile
+git commit -m "Add Aptfile for pdftk-java dependencies"
+```
+
+### 2. Add Buildpacks to Your App
 
 You need to add **two buildpacks** in this order:
 
@@ -27,18 +46,18 @@ You need to add **two buildpacks** in this order:
 heroku buildpacks:add --index 1 https://github.com/heroku/heroku-buildpack-apt
 
 # Then, add this pdftk buildpack (to configure paths)
-heroku buildpacks:add https://github.com/YOUR_USERNAME/heroku-pdftk-buildpack
+heroku buildpacks:add https://github.com/rcoenen/heroku-pdftk-buildpack
 ```
 
 **Important**: The apt buildpack must come before this buildpack.
 
-### 2. Deploy Your App
+### 3. Deploy Your App
 
 ```bash
 git push heroku main
 ```
 
-### 3. Use pdftk in Your Application
+### 4. Use pdftk in Your Application
 
 The `pdftk` command will be available in your application's runtime environment:
 
@@ -54,17 +73,19 @@ exec('pdftk input.pdf fill_form data.fdf output output.pdf');
 
 ## What This Buildpack Does
 
-1. Works with the apt buildpack to install `pdftk-java` and its dependencies
+1. Works with the apt buildpack to install `pdftk-java` and its dependencies (specified in your app's `Aptfile`)
 2. Configures the PATH to include `/app/.apt/usr/bin` where pdftk is installed
 3. Verifies pdftk installation during build
 
 ## Dependencies
 
-The following packages are automatically installed via the `Aptfile`:
+The following packages are installed via the `Aptfile` **in your application root** (not the buildpack repo):
 
 - `pdftk-java` - The PDF toolkit
 - `libbcprov-java` - Bouncy Castle cryptography provider
 - `libcommons-lang3-java` - Apache Commons utilities
+
+**Note**: The `Aptfile` in this buildpack repository is just a reference example. You must create your own `Aptfile` in your Laravel/PHP application root.
 
 ## Compatibility
 
@@ -85,9 +106,9 @@ If you're upgrading from the old GCJ-based buildpack:
 ### pdftk command not found
 
 Make sure:
-1. The apt buildpack is added and comes before this buildpack
-2. You have an `Aptfile` in your repository root (this buildpack provides one)
-3. You've deployed your app after adding the buildpacks
+1. You created an `Aptfile` in your **application root** (see step 1 above)
+2. The apt buildpack is added and comes before this buildpack
+3. You've deployed your app after adding the buildpacks and the Aptfile
 
 ### Checking pdftk version
 
