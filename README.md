@@ -2,6 +2,29 @@
 
 > **Note**: This repository has evolved from a custom buildpack into a comprehensive guide for using pdftk-java on Heroku-24 with **standard buildpacks only**. No custom buildpack is needed!
 
+## ⚠️ Important: Heroku Stack Dependency
+
+**This solution is specifically designed for Heroku-24** (Ubuntu 24.04). It relies on:
+- Heroku-24 stack architecture
+- Ubuntu 24.04 package layouts
+- Specific apt buildpack behavior
+
+**Do NOT upgrade to future Heroku stacks (Heroku-26/28) without re-testing PDFtk!**
+
+### Expected Lifetime
+- ✅ **Safe until ~2029** - Heroku-24 LTS support
+- ⚠️ **Re-test required** when Heroku deprecates Heroku-24
+- 💡 **Migration path** - See [Alternative Approaches](#alternative-approaches) below
+
+### Why This Matters
+
+The solution works by fixing broken symlinks in the Java configuration. This is a **workaround for apt buildpack's non-standard installation paths**, not an official solution. Future Heroku stacks may:
+- Change `/app/.apt/` structure
+- Use different OpenJDK packaging
+- Modify how apt buildpack works
+
+**Bottom line:** This is a "we know what we're doing" hack. Document it, test it, plan for eventual migration.
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -333,6 +356,62 @@ This setup successfully powers production Laravel applications on Heroku-24, gen
 - Immigration application forms
 - Multi-page document packages (28+ pages)
 - Automated PDF generation at scale
+
+---
+
+## Alternative Approaches
+
+If this symlink-fixing approach seems too fragile for your use case, consider these alternatives:
+
+### 1. Cloud PDF Services (Recommended for Long-term)
+**Pros:**
+- No infrastructure management
+- Auto-scaling
+- Professional support
+- No Heroku stack dependency
+
+**Options:**
+- **AWS Lambda** with PDFtk layer
+- **DocRaptor API** - PDF generation as a service
+- **PDF.co API** - PDF manipulation API
+
+**Cons:** Monthly costs, vendor lock-in
+
+### 2. Revert to This Custom Buildpack
+**Pros:**
+- Simpler than symlink fixing
+- Isolated from system changes
+- Clear, single-purpose solution
+
+**Cons:**
+- Unmaintained (archived)
+- May break on future stacks
+- Extra buildpack to manage
+
+**When to use:** If the symlink approach breaks and you need a quick fix
+
+### 3. Docker/Container Deployment
+**Pros:**
+- Full control over environment
+- No symlink hacks needed
+- Install PDFtk normally
+
+**Cons:**
+- Requires Heroku plan upgrade
+- More complex deployment
+- Different workflow
+
+**When to use:** If you're already containerizing or have complex dependencies
+
+### Decision Matrix
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| **Small app, low volume** | Current symlink solution |
+| **Enterprise, mission-critical** | Cloud PDF service |
+| **Symlink solution breaks** | Revert to custom buildpack |
+| **Already using Docker** | Container deployment |
+| **Budget constraints** | Current symlink solution |
 
 ---
 
