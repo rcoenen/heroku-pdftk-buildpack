@@ -4,57 +4,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is a Heroku buildpack that installs **pdftk-java** on Heroku-24 for PDF manipulation. Unlike the legacy version, this buildpack uses the modern pdftk-java implementation from Ubuntu 24.04 apt repositories instead of compiling from source or bundling binaries.
+This repository is **comprehensive documentation** for running pdftk-java on Heroku-24 using **standard buildpacks only**. It is NO LONGER a custom buildpack - it evolved from a custom buildpack into a community guide after discovering that standard buildpacks are sufficient.
 
-**Supported Stack**: Heroku-24 (Ubuntu 24.04) only
+**Repository Purpose**: Documentation and troubleshooting guide
 
-## Architecture
+**Custom Buildpack Status**: OBSOLETE - the `bin/` directory is preserved for historical reference only
 
-This is a lightweight buildpack that works in conjunction with the Heroku APT buildpack.
+## What This Repository Contains
 
-### Buildpack Components
+### Active Documentation (README.md)
 
-- **bin/detect**: Always returns success, making this buildpack compatible with any Heroku app
-- **bin/compile**: Configuration script that:
-  - Creates `.profile.d/pdftk.sh` to add `/app/.apt/usr/bin` to PATH
-  - Verifies pdftk installation if available at build time
-  - Outputs installation status messages
-- **bin/release**: Returns empty config (no addons or config vars needed)
-- **Aptfile**: Lists packages to install via heroku-buildpack-apt:
-  - `pdftk-java` - The PDF toolkit (modern Java-based implementation)
-  - `libbcprov-java` - Bouncy Castle cryptography provider
-  - `libcommons-lang3-java` - Apache Commons utilities
+The README.md is the main deliverable - a complete guide covering:
 
-### How It Works
+1. **The Journey** - How we migrated from GCJ pdftk to pdftk-java on Heroku-24
+2. **The Working Solution** - Required files (Aptfile, .profile) for Laravel apps
+3. **Problems & Fixes** - Documented issues encountered (Java security symlinks, JAR paths)
+4. **Complete Setup** - Step-by-step instructions anyone can follow
+5. **Why pdftk-java** - Comparison with alternatives (qpdf, pdfcpu)
 
-1. **heroku-buildpack-apt** (must be added before this buildpack) installs packages from Aptfile to `/app/.apt/usr/bin/`
-2. This buildpack configures PATH via `.profile.d/pdftk.sh` so pdftk is available at runtime
-3. Applications can use `pdftk` command normally - it's CLI-compatible with original pdftk
+### Obsolete Code (bin/, Aptfile in repo)
 
-### Key Design Decisions
+- **bin/compile, bin/detect, bin/release**: Old buildpack scripts (UNUSED)
+- **Aptfile in root**: Example only; users must create Aptfile in their app
+- These files are preserved for git history but are not part of the solution
 
-- **No binary bundling**: pdftk-java is installed via apt, not pre-compiled binaries
-- **Minimal buildpack**: Only handles PATH configuration; apt buildpack does the heavy lifting
-- **Heroku-24 only**: Older stacks (heroku-20, heroku-22) are not supported in current version
-- **pdftk-java vs original pdftk**: Uses actively-maintained Java implementation instead of obsolete GCJ-based C++ version
+## The Actual Solution (What Users Need)
 
-## Usage Pattern
+Users need to create two files in their **Laravel app root** (not this repo):
 
-Users must add TWO buildpacks in this order:
-
-```bash
-heroku buildpacks:add --index 1 https://github.com/heroku/heroku-buildpack-apt
-heroku buildpacks:add https://github.com/USERNAME/heroku-pdftk-buildpack
+### 1. Aptfile (in user's app)
+```
+openjdk-17-jre-headless
+pdftk-java
+libbcprov-java
+libcommons-lang3-java
 ```
 
-The apt buildpack must come first to install packages before this buildpack configures paths.
+### 2. .profile (in user's app)
+- Fixes Java security configuration symlinks (broken by apt buildpack's /app/.apt/ install location)
+- Creates pdftk wrapper script with correct JAR paths
+- Runs on every dyno boot
 
-## Compatibility Notes
+### 3. Buildpack Configuration
+- heroku-community/apt (index 1 - must be first)
+- heroku/php or heroku/nodejs (as needed)
+- NO custom pdftk buildpack needed
 
-- **CLI Compatibility**: pdftk-java has identical command-line syntax to original pdftk
-- **Laravel/PHP**: No code changes needed when migrating from old buildpack
-- **Stack Migration**: This version only supports Heroku-24; legacy binaries were removed
+## Key Technical Discoveries
 
-## No Build/Compilation Process
+### Discovery 1: heroku-buildpack-apt handles PATH automatically
+- Creates `.profile.d/000_apt.sh` that exports `PATH="$HOME/.apt/usr/bin:$PATH"`
+- Custom buildpack for PATH configuration is redundant
 
-Unlike the legacy buildpack, there is NO compilation step. pdftk-java is installed directly from Ubuntu repositories. The old `scripts/build.sh` and binary directories have been removed.
+### Discovery 2: Ubuntu's pdftk-java package has broken symlinks on Heroku
+- Java config files are symlinks pointing to `/etc/java-17-openjdk/`
+- But apt buildpack installs to `/app/.apt/etc/java-17-openjdk/`
+- Result: `java.lang.InternalError: Error loading java.security file`
+- Solution: `.profile` script recreates symlinks on boot
+
+### Discovery 3: pdftk wrapper has hardcoded paths
+- Ubuntu's `/usr/bin/pdftk.pdftk-java` contains: `/usr/share/java/bcprov.jar`
+- On Heroku, JARs are at: `/app/.apt/usr/share/java/bcprov.jar`
+- Solution: Custom wrapper in `.profile` with correct paths
+
+## Why pdftk-java (Not qpdf)
+
+Research showed:
+- **pdftk-java is actively maintained** (2025) and 7-8x faster than qpdf
+- **qpdf lacks form filling** - critical feature for Laravel apps
+- **Laravel ecosystem uses mikehaertl/php-pdftk** - works with pdftk-java
+- **CLI compatibility** - pdftk-java is drop-in replacement for original pdftk
+
+## Repository Maintenance
+
+When updating this repository:
+
+1. **Focus on README.md** - The guide is the deliverable
+2. **Update based on user feedback** - Document new issues/solutions
+3. **Preserve old buildpack code** - Don't delete bin/ (historical reference)
+4. **Keep CLAUDE.md current** - Document repository evolution
+
+## For Future Work
+
+If issues arise with the documented solution:
+- Test the fix locally with Docker (`docker run ubuntu:24.04`)
+- Document the problem and solution in README.md
+- Update .profile example with fixes
+- Consider whether a minimal buildpack wrapper is actually needed
