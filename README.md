@@ -1,51 +1,102 @@
-Custom buildpack that will install pdftk into /app/bin on Heroku. Supports **cedar-14**, **heroku-16**, **heroku-18** and **heroku-20**.
+# Heroku PDFtk Buildpack
 
-# Heroku-18
-Since GCJ was dropped, using:
-https://launchpad.net/ubuntu/bionic/amd64/gcj-6-jdk/6.4.0-14ubuntu1
+Custom buildpack that installs **pdftk-java** on Heroku for PDF manipulation. Supports **Heroku-24** (Ubuntu 24.04).
 
-which needs:
-https://launchpad.net/ubuntu/bionic/amd64/gcj-6/6.4.0-14ubuntu1
-https://launchpad.net/ubuntu/bionic/amd64/gcj-6-jre/6.4.0-14ubuntu1
-https://launchpad.net/ubuntu/bionic/amd64/gcj-6-jre-headless/6.4.0-14ubuntu1
-https://launchpad.net/ubuntu/bionic/amd64/gcj-6-jre-lib/6.4.0-14ubuntu1
+This buildpack uses the modern [pdftk-java](https://gitlab.com/pdftk-java/pdftk) implementation, which is a drop-in replacement for the original pdftk. It has identical command-line syntax, so your existing code will work without modifications.
 
-https://launchpad.net/ubuntu/bionic/amd64/libgcj-bc/6.4.0-3ubuntu1
-https://launchpad.net/ubuntu/bionic/amd64/libgcj17/6.4.0-14ubuntu1
-https://launchpad.net/ubuntu/bionic/amd64/libgcj17-dev/6.4.0-14ubuntu1
-https://launchpad.net/ubuntu/bionic/amd64/libgcj17-awt/6.4.0-14ubuntu1
-https://launchpad.net/ubuntu/bionic/amd64/libgcj-common/1:6.4-3ubuntu1
+## Why pdftk-java?
 
-https://launchpad.net/ubuntu/bionic/amd64/ecj-gcj/3.11.1-2
-https://launchpad.net/ubuntu/bionic/amd64/ecj1/3.11.1-2
-https://launchpad.net/ubuntu/bionic/amd64/libecj-java/3.16.0-1~18.04
-https://launchpad.net/ubuntu/bionic/amd64/libecj-java-gcj/3.11.1-2
+The original pdftk (C++/GCJ version) is no longer maintained and doesn't work on modern Heroku stacks. pdftk-java is:
+- Actively maintained
+- Compatible with modern Ubuntu/Heroku stacks
+- 100% CLI-compatible with original pdftk
+- Based on OpenJDK instead of obsolete GCJ
 
+## Requirements
 
-# How to use
+This buildpack requires the **Heroku APT buildpack** to install system packages.
 
-1. Add this buildpack to your app. 
-2. Add the libgcj.so.* to your search path: `heroku config:set LD_LIBRARY_PATH=/app/bin`
-3. Use /app/bin/pdftk. BTW, the default PATH includes /app/bin, so this might happen automatically.
+## How to Use
 
-# How to upgrade PDFTK
+### 1. Add Buildpacks to Your App
 
-Update the tarball_url line in scripts/build.sh
+You need to add **two buildpacks** in this order:
 
-`heroku create`
+```bash
+# First, add the apt buildpack (to install pdftk-java via apt)
+heroku buildpacks:add --index 1 https://github.com/heroku/heroku-buildpack-apt
 
-`heroku config:set BUILDPACK_URL=https://github.com/fxtentacle/heroku-buildpack-apt`
+# Then, add this pdftk buildpack (to configure paths)
+heroku buildpacks:add https://github.com/YOUR_USERNAME/heroku-pdftk-buildpack
+```
 
-`git push heroku master`
+**Important**: The apt buildpack must come before this buildpack.
 
-Now you'll have a new Heroku app on the default stack that runs the `scripts/build.sh` script in this buildpack. That script will download the most recent PDFTK source and configure it with default options.
+### 2. Deploy Your App
 
-Use `heroku logs -t` to see when compilation is done. It'll start showing dots..
+```bash
+git push heroku main
+```
 
-`heroku open`
+### 3. Use pdftk in Your Application
 
-1. Download the generated pdftk.zip
-2. Chmod +x them
-3. put them into `binaries-$STACK/` into this buildpack. $STACK shall be the name of your stack as given in the Heroku $STACK variable.
+The `pdftk` command will be available in your application's runtime environment:
 
-`heroku ps:scale web=0` to turn off the dyno.
+```bash
+pdftk input.pdf output output.pdf
+```
+
+For PHP/Laravel applications:
+
+```php
+exec('pdftk input.pdf fill_form data.fdf output output.pdf');
+```
+
+## What This Buildpack Does
+
+1. Works with the apt buildpack to install `pdftk-java` and its dependencies
+2. Configures the PATH to include `/app/.apt/usr/bin` where pdftk is installed
+3. Verifies pdftk installation during build
+
+## Dependencies
+
+The following packages are automatically installed via the `Aptfile`:
+
+- `pdftk-java` - The PDF toolkit
+- `libbcprov-java` - Bouncy Castle cryptography provider
+- `libcommons-lang3-java` - Apache Commons utilities
+
+## Compatibility
+
+- **Supported Stacks**: Heroku-24 (Ubuntu 24.04)
+- **Legacy Support**: For older stacks (Heroku-20, Heroku-22), use an earlier version of this buildpack from the git history
+
+## Migrating from Old pdftk Buildpack
+
+If you're upgrading from the old GCJ-based buildpack:
+
+1. No code changes needed - pdftk-java has identical CLI syntax
+2. Update your buildpack configuration as shown above
+3. Deploy to Heroku-24 stack
+4. Test your PDF operations
+
+## Troubleshooting
+
+### pdftk command not found
+
+Make sure:
+1. The apt buildpack is added and comes before this buildpack
+2. You have an `Aptfile` in your repository root (this buildpack provides one)
+3. You've deployed your app after adding the buildpacks
+
+### Checking pdftk version
+
+```bash
+heroku run pdftk --version
+```
+
+You should see output indicating pdftk-java version 3.3.3 or newer.
+
+## Support
+
+This buildpack is designed for Heroku-24. For issues or questions, please open an issue on GitHub.

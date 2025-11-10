@@ -6,26 +6,27 @@ set -e
 # Define the build directory
 BUILD_DIR=$1
 
-# Create the bin directory inside the build directory
-mkdir -p "$BUILD_DIR/bin/"
-
-# Copy the pdftk binaries for the current stack to the bin directory
-cp -a binaries-$STACK/* "$BUILD_DIR/bin/"
-
-# Ensure the pdftk binary is executable
-chmod +x "$BUILD_DIR/bin/pdftk"
-
-# Display the pdftk version to verify the installation
-show_version=$(LD_LIBRARY_PATH=$BUILD_DIR/bin $BUILD_DIR/bin/pdftk --version 2>&1 | tr '\n' ' ')
-echo "-----> heroku-pdftk-buildpack: Installed to app/bin. ${show_version}"
+echo "-----> Installing pdftk-java buildpack"
 
 # Create the profile.d directory if it doesn't exist
 mkdir -p "$BUILD_DIR/.profile.d/"
 
-# Create a shell script in the profile.d directory to set the LD_LIBRARY_PATH
+# Create a shell script in the profile.d directory to set the PATH
+# pdftk-java will be installed by apt buildpack to /app/.apt/usr/bin/
 cat <<EOF >"$BUILD_DIR/.profile.d/pdftk.sh"
-export LD_LIBRARY_PATH="\$LD_LIBRARY_PATH:\$HOME/bin"
+export PATH="\$PATH:/app/.apt/usr/bin"
 EOF
+
+# Verify pdftk installation if available at build time
+# Note: apt buildpack installs to BUILD_DIR/.apt/usr/bin during build
+if [ -f "$BUILD_DIR/.apt/usr/bin/pdftk" ]; then
+    show_version=$($BUILD_DIR/.apt/usr/bin/pdftk --version 2>&1 | head -n 1 | tr '\n' ' ' || echo "pdftk-java installed")
+    echo "-----> heroku-pdftk-buildpack: ${show_version}"
+else
+    echo "-----> heroku-pdftk-buildpack: pdftk will be available at runtime via apt buildpack"
+fi
+
+echo "-----> pdftk-java buildpack installation complete"
 
 # Exit successfully
 exit 0
